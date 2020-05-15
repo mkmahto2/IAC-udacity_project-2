@@ -1,6 +1,6 @@
 [
   {
-    "ParameterKey": "EnvironmentName",
-    "ParameterValue": "IACProject2"
+     "ParameterKey": "EnvironmentName",
+     "ParameterValue": "IACProject2"
   }
 ]
