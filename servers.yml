@@ -1,26 +1,14 @@
-Description: >
-   
-     This template is for Project 2 in the Udacity DevOps Engineer Nanodegree
-
+Description:
+  Stack Server Components
 Parameters:
   EnvironmentName:
-    Description: An environment that will be prefixed to resources
-    Type: String
-
-  SSHLocation: 
-    Description: "The IP address range that can be used to SSH to the EC2 instances"
-    Type: String
-    MinLength: 9
-    MaxLength: 18
-    Default: "0.0.0.0/0"
-    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
-    ConstraintDescription: "must be a valid IP CIDR range of the form x.x.x.x/x."
-
+      Description: A parameter that we are passing with the env name.
+      Type: String
 Resources:
   LBSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow http to our load balancer
+      GroupDescription: Allow HTTP to our load balancer
       VpcId:
         Fn::ImportValue:
           !Sub "${EnvironmentName}-VPCID"
@@ -34,11 +22,10 @@ Resources:
         FromPort: 80
         ToPort: 80
         CidrIp: 0.0.0.0/0
-
   WebServerSecGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow http to our hosts and SSH from local only
+      GroupDescription: Allow HTTP to our hosts and SSH from local only
       VpcId:
         Fn::ImportValue:
           !Sub "${EnvironmentName}-VPCID"
@@ -50,39 +37,36 @@ Resources:
       - IpProtocol: tcp
         FromPort: 22
         ToPort: 22
-        CidrIp: !Ref SSHLocation
+        CidrIp: 0.0.0.0/0
       SecurityGroupEgress:
       - IpProtocol: tcp
         FromPort: 0
         ToPort: 65535
         CidrIp: 0.0.0.0/0
-
   WebAppLaunchConfig:
     Type: AWS::AutoScaling::LaunchConfiguration
     Properties:
       UserData:
         Fn::Base64: !Sub |
-          #!/bin/bash 
-          sudo apt-get update -y
-          sudo apt-get install apache2 -y
-          sudo systemctl start apache2.service
+          #!/bin/bash
+          apt-get update -y
+          apt-get install apache2 -y
+          systemctl start apache2.service
           cd /var/www/html
-          aws s3 cp s3://udacity-demo-3/udacity.zip .
-          unzip -o udacity.zip
+          echo "Udacity Demo Web Server Running!" > index.html
       ImageId: ami-06d51e91cea0dac8d
       SecurityGroups:
       - Ref: WebServerSecGroup
-      InstanceType: t3.medium
+      InstanceType: t3.small
       BlockDeviceMappings:
       - DeviceName: "/dev/sdk"
         Ebs:
           VolumeSize: '10'
-  
   WebAppGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
       VPCZoneIdentifier:
-      - Fn::ImportValue:
+      - Fn::ImportValue: 
           !Sub "${EnvironmentName}-PRIV-NETS"
       LaunchConfigurationName:
         Ref: WebAppLaunchConfig
@@ -90,7 +74,6 @@ Resources:
       MaxSize: '5'
       TargetGroupARNs:
       - Ref: WebAppTargetGroup
-
   WebAppLB:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
@@ -99,7 +82,6 @@ Resources:
       - Fn::ImportValue: !Sub "${EnvironmentName}-PUB2-SN"
       SecurityGroups:
       - Ref: LBSecGroup
-
   Listener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -107,10 +89,10 @@ Resources:
       - Type: forward
         TargetGroupArn:
           Ref: WebAppTargetGroup
-      LoadBalancerArn: !Ref WebAppLB
+      LoadBalancerArn:
+        Ref: WebAppLB
       Port: '80'
       Protocol: HTTP
-
   ALBListenerRule:
     Type: AWS::ElasticLoadBalancingV2::ListenerRule
     Properties:
@@ -122,7 +104,6 @@ Resources:
         Values: [/]
       ListenerArn: !Ref 'Listener'
       Priority: 1
-
   WebAppTargetGroup:
     Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
@@ -134,12 +115,6 @@ Resources:
       Port: 80
       Protocol: HTTP
       UnhealthyThresholdCount: 5
-      VpcId:
+      VpcId: 
         Fn::ImportValue:
           Fn::Sub: "${EnvironmentName}-VPCID"
-          
-Outputs:
-  LoadBalancerDNS:
-    Value: !Join [ "", [ 'http://', !GetAtt WebAppLB.DNSName ]]
-    Export:
-      Name: "DNS-URL" 
